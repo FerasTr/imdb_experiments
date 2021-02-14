@@ -20,6 +20,7 @@ class Train:
             self.y_test,
         ) = self.data.get_encoded_train_test()
         self.final_results = self.y_test.copy(deep=True).to_frame()
+        self.scores = []
 
     def _saveResults(self):
         """
@@ -40,28 +41,17 @@ class Train:
         Main training method, trains multiple methods with different parameters
         """
         print("Training...")
-        self.scores = []
 
         iterations = [100, 300, 500]
         neighs = [3, 6, 10, 20, 40]
 
         for _neigh in neighs:
-            res, sc = self._KNN(neighbors=_neigh)
-            self.scores.append(sc)
-            self.final_results = self.final_results.join(res)
+            self._KNN(neighbors=_neigh)
 
         for _iter in iterations:
-            res, sc = self._mlp(iterations=_iter)
-            self.scores.append(sc)
-            self.final_results = self.final_results.join(res)
-
-            res, sc = self._svr(iterations=_iter)
-            self.scores.append(sc)
-            self.final_results = self.final_results.join(res)
-
-            res, sc = self._bays_ridge(iterations=_iter)
-            self.scores.append(sc)
-            self.final_results = self.final_results.join(res)
+            self._mlp(iterations=_iter)
+            self._svr(iterations=_iter)
+            self._bays_ridge(iterations=_iter)
 
         # Save model results
         self.saveResults()
@@ -84,11 +74,7 @@ class Train:
         """
         name = f"mlp_{iterations}"
         mlpr = MLPRegressor(random_state=1, max_iter=iterations)
-        mlpr.fit(self.x_train, self.y_train)
-        prediction = mlpr.predict(self.x_test)
-        results = pd.Series(prediction, name=name, index=self.final_results.index)
-        score = mlpr.score(self.x_test, self.y_test)
-        return results, {name: score}
+        self._model_train(name, mlpr)
 
     def _KNN(self, neighbors=10):
         """
@@ -97,20 +83,10 @@ class Train:
         Parameters
         ---------
         neighbors: number of neighbors to use in learning
-
-        Returns
-        ---------
-        results: Series containing the results indexed by imdb id
-
-        dictonary containing the name of the experiment and the accuracy
         """
         name = f"knn_{neighbors}"
         neigh = KNeighborsRegressor(n_neighbors=neighbors, algorithm="auto")
-        neigh.fit(self.x_train, self.y_train)
-        prediction = neigh.predict(self.x_test)
-        score = neigh.score(self.x_test, self.y_test)
-        results = pd.Series(prediction, name=name, index=self.final_results.index)
-        return results, {name: score}
+        self._model_train(name, neigh)
 
     def _bays_ridge(self, iterations=100):
         """
@@ -119,20 +95,10 @@ class Train:
         Parameters
         ---------
         iterations: number of iterations to run the algortithm for
-
-        Returns
-        ---------
-        results: Series containing the results indexed by imdb id
-
-        dictonary containing the name of the experiment and the accuracy
         """
         name = f"baysRidge_{iterations}"
         rig = linear_model.BayesianRidge(n_iter=iterations)
-        rig.fit(self.x_train, self.y_train)
-        prediction = rig.predict(self.x_test)
-        score = rig.score(self.x_test, self.y_test)
-        results = pd.Series(prediction, name=name, index=self.final_results.index)
-        return results, {name: score}
+        self._model_train(name, rig)
 
     def _svr(self, iterations=100):
         """
@@ -141,21 +107,27 @@ class Train:
         Parameters
         ---------
         iterations: number of iterations to run the algortithm for
-
-        Returns
-        ---------
-        results: Series containing the results indexed by imdb id
-
-        dictonary containing the name of the experiment and the accuracy
         """
         name = f"svr_{iterations}"
-        svr = SVR(max_iter=iterations)
-        svr = make_pipeline(StandardScaler(), SVR(C=1.0, epsilon=0.2))
-        svr.fit(self.x_train, self.y_train)
-        prediction = svr.predict(self.x_test)
-        score = svr.score(self.x_test, self.y_test)
+        svr = make_pipeline(
+            StandardScaler(), SVR(C=1.0, epsilon=0.2, max_iter=iterations)
+        )
+        self._model_train(name, svr)
+
+    def _model_train(self, name, model):
+        """
+        Fit a model to the train data and compute the score on the test data
+
+        Parameters
+        ---------
+        name: model's name
+        model: model to train
+        """
+        prediction = model.predict(self.x_test)
+        score = model.score(self.x_test, self.y_test)
         results = pd.Series(prediction, name=name, index=self.final_results.index)
-        return results, {name: score}
+        self.scores.append(score)
+        self.final_results = self.final_results.join(results)
 
 
 if __name__ == "__main__":
