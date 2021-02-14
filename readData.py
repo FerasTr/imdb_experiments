@@ -69,8 +69,6 @@ class imdb_data:
                 file, engine="python", delimiter=",", index_col="imdb_title_id"
             )
         )
-        # Remove rows where one element is missing
-        imdb.dropna(inplace=True)
         # Remove non English movies
         imdb = imdb[imdb.language == "English"]
         # Convert year col to numeric
@@ -102,6 +100,8 @@ class imdb_data:
             ],
             inplace=True,
         )
+        # Remove rows where one element is missing
+        imdb.dropna(inplace=True)
         # Limit director/actor list of each movie to one director/4 actors
         imdb.actors = imdb.actors.apply(
             lambda r: (",".join([x.strip() for x in r.split(",")[:3]])).strip()
@@ -111,13 +111,14 @@ class imdb_data:
         )
         # Remove duplicate lines
         imdb.drop_duplicates(inplace=True)
+        imdb = imdb[:5000]
         return imdb
 
 
 if __name__ == "__main__":
     # Testing data structure
     data = imdb_data()
-    print(data.data.loc["tt9173418"])
+    print(data.data.loc["tt0379918"])
     print(data.data.head())
     print(data.data.tail())
     print(data.data.info())
